@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src *; img-src data:; base-uri 'none'; form-action 'none'">
+<title>peekless</title>
+<style>
+:root {
+  --bg: #f6f5f1; --card: #ffffff; --ink: #1d1d1b; --muted: #6b6a64; --line: #e3e1d9;
+  --accent: #2f5d50; --accent-ink: #ffffff; --warn-bg: #fff4d6; --warn-line: #e8c55a;
+  --bad: #b3261e; --code-bg: #f0efe9; --good: #2f7d4f;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #151514; --card: #1e1e1c; --ink: #ecebe6; --muted: #9b9a93; --line: #34332f;
+    --accent: #7fc4a8; --accent-ink: #10231c; --warn-bg: #3a3118; --warn-line: #8a7230;
+    --bad: #f2887f; --code-bg: #262623; --good: #7fc4a8;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+.brand { font-weight: 700; letter-spacing: .02em; color: var(--muted); font-size: 14px; }
+.brand b { color: var(--accent); }
+h1 { font-size: 24px; line-height: 1.25; margin: 8px 0 12px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 14px 0; }
+.meta { color: var(--muted); font-size: 14px; }
+.fp { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.fp .emoji { font-size: 28px; letter-spacing: 6px; }
+pre, code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13.5px; }
+pre { background: var(--code-bg); border-radius: 8px; padding: 10px 12px; margin: 6px 0 0;
+  white-space: pre-wrap; word-break: break-word; }
+.text { white-space: pre-wrap; word-break: break-word; }
+.ph { background: var(--accent); color: var(--accent-ink); border-radius: 4px; padding: 0 3px; }
+.warn { background: var(--warn-bg); border-color: var(--warn-line); }
+.warn li { margin: 4px 0; }
+.field { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 14px; }
+.field:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+.field label.main { font-weight: 600; display: block; }
+.tag { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 6px; }
+.row { display: flex; gap: 8px; align-items: stretch; margin-top: 8px; }
+input[type=text], input[type=password], textarea {
+  flex: 1; width: 100%; font: inherit; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+textarea { min-height: 96px; resize: vertical; }
+textarea.masked { -webkit-text-security: disc; }
+input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+button { font: inherit; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  padding: 8px 12px; cursor: pointer; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; padding: 10px 18px; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.toggles { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; font-size: 14px; color: var(--muted); }
+.toggles label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.err { color: var(--bad); font-size: 14px; margin-top: 6px; }
+.ok { color: var(--good); font-size: 14px; margin-top: 6px; }
+.actions { display: flex; gap: 10px; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-top: 18px; }
+.done { text-align: center; padding: 32px 16px; }
+.done .big { font-size: 40px; }
+footer { color: var(--muted); font-size: 13px; margin-top: 28px; }
+a { color: var(--accent); }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<main id="app">
+  <div class="brand"><b>peekless</b> · secret handoff</div>
+  <div id="status" class="card meta">Loading request…</div>
+</main>
+<script>
+"use strict";
+const VERSION = "0.1.0";
+const EMOJI = ["🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐸","🐵","🐔",
+  "🐧","🐦","🐤","🦆","🦉","🐴","🦄","🐝","🐛","🦋","🐌","🐞","🐢","🐍","🦖","🐙",
+  "🦑","🦀","🐬","🐳","🦈","🐊","🦓","🦒","🐘","🦏","🐪","🦘","🌵","🌲","🌻","🍄",
+  "🌙","🔥","🌈","🍎","🍋","🍉","🍇","🍓","🍒","🍍","🥕","🌽","🍩","🍪","🎈","🚀"];
+const BUCKETS = [4 << 10, 16 << 10, 64 << 10, 256 << 10, 1 << 20];
+const te = new TextEncoder(), td = new TextDecoder("utf-8", { fatal: true });
+const SALT = te.encode("peekless/v1");
+
+// ---------- crypto (mirrors src/crypto.rs; see spec/protocol.md) ----------
+function b64d(s) {
+  s = s.replace(/-/g, "+").replace(/_/g, "/");
+  while (s.length % 4) s += "=";
+  return Uint8Array.from(atob(s), c => c.charCodeAt(0));
+}
+function b64e(b) {
+  let s = ""; for (const x of b) s += String.fromCharCode(x);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function cat(...parts) {
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let o = 0; for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+}
+async function hkdf(ikm, salt, info, len) {
+  const key = await crypto.subtle.importKey("raw", ikm, "HKDF", false, ["deriveBits"]);
+  return new Uint8Array(await crypto.subtle.deriveBits(
+    { name: "HKDF", hash: "SHA-256", salt, info: te.encode(info) }, key, len * 8));
+}
+function pad(data) {
+  const size = BUCKETS.find(b => data.length + 4 <= b);
+  if (!size) throw new Error("Your answer is too large (max 1 MiB).");
+  const out = new Uint8Array(size);
+  new DataView(out.buffer).setUint32(0, data.length);
+  out.set(data, 4);
+  return out;
+}
+function unpad(p) {
+  const len = new DataView(p.buffer, p.byteOffset).getUint32(0);
+  if (len > p.length - 4) throw new Error("bad padding");
+  return p.subarray(4, 4 + len);
+}
+async function aesOpen(key, aad, blob) {
+  const k = await crypto.subtle.importKey("raw", key, "AES-GCM", false, ["decrypt"]);
+  const pt = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: blob.subarray(0, 12), additionalData: te.encode(aad) }, k, blob.subarray(12));
+  return unpad(new Uint8Array(pt));
+}
+async function aesSeal(key, aad, plaintext) {
+  const k = await crypto.subtle.importKey("raw", key, "AES-GCM", false, ["encrypt"]);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: te.encode(aad) }, k, pad(plaintext));
+  return cat(iv, new Uint8Array(ct));
+}
+async function fingerprint(K) {
+  const b = await hkdf(K, SALT, "fingerprint", 3);
+  const bits = (b[0] << 16) | (b[1] << 8) | b[2];
+  return [0, 1, 2, 3].map(i => EMOJI[(bits >> (18 - 6 * i)) & 63]).join(" ");
+}
+async function sealAnswer(pkR, id, plaintext) {
+  const eph = await crypto.subtle.generateKey({ name: "X25519" }, true, ["deriveBits"]);
+  const epk = new Uint8Array(await crypto.subtle.exportKey("raw", eph.publicKey));
+  const peer = await crypto.subtle.importKey("raw", pkR, { name: "X25519" }, false, []);
+  const shared = new Uint8Array(await crypto.subtle.deriveBits({ name: "X25519", public: peer }, eph.privateKey, 256));
+  if (shared.every(x => x === 0)) throw new Error("degenerate request key");
+  const ka = await hkdf(shared, cat(epk, pkR), "answer:" + id, 32);
+  return cat(epk, await aesSeal(ka, "peekless/v1/answer:" + id, plaintext));
+}
+
+// ---------- tiny DOM helpers (config text is untrusted: textContent only) ----------
+function h(tag, attrs = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v === true) el.setAttribute(k, "");
+    else if (v !== false && v != null) el.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) if (kid != null) el.append(kid);
+  return el;
+}
+function linkify(text) {
+  const out = [];
+  let last = 0;
+  for (const m of text.matchAll(/https?:\/\/[^\s<>"')\]]+/g)) {
+    out.push(text.slice(last, m.index));
+    out.push(h("a", { href: m[0], target: "_blank", rel: "noopener noreferrer" }, m[0]));
+    last = m.index + m[0].length;
+  }
+  out.push(text.slice(last));
+  return h("div", { class: "text" }, out);
+}
+function shq(a) {
+  return /^[A-Za-z0-9_\-+=.,/:@%^]+$/.test(a) ? a : "'" + a.replace(/'/g, "'\\''") + "'";
+}
+function templateView(t) {
+  const out = [];
+  let last = 0;
+  for (const m of t.matchAll(/\{\{([^}]*)\}\}/g)) {
+    if (m.index > 0 && t[m.index - 1] === "\\") continue;
+    out.push(t.slice(last, m.index));
+    out.push(h("span", { class: "ph" }, m[1].trim()));
+    last = m.index + m[0].length;
+  }
+  out.push(t.slice(last));
+  return h("pre", {}, out);
+}
+function status(msg, isError) {
+  const app = document.getElementById("app");
+  app.replaceChildren(app.firstElementChild, h("div", { class: "card " + (isError ? "err" : "meta") }, msg));
+}
+function forgetLink() {
+  // Keep the key out of the tab's history once it has served its purpose.
+  history.replaceState(null, "", location.pathname + location.search);
+}
+function relTime(ts) {
+  const s = Math.round(ts - Date.now() / 1000);
+  if (s <= 0) return "expired";
+  if (s < 90) return `in ${s} s`;
+  if (s < 5400) return `in ${Math.round(s / 60)} min`;
+  return `in ${(s / 3600).toFixed(1)} h`;
+}
+function compile(p) {
+  try { return new RegExp(p, "u"); } catch { try { return new RegExp(p); } catch { return null; } }
+}
+
+// ---------- main ----------
+async function main() {
+  if (!window.crypto?.subtle) return status("This page needs a secure context (HTTPS or localhost) for encryption.", true);
+  const params = new URLSearchParams(location.hash.slice(1));
+  const kParam = params.get("k");
+  if (!kParam) {
+    return status("This page receives peekless requests. Open the exact link your agent gave you — " +
+      "everything needed to decrypt the request is in the part after “#”, which never leaves your browser.");
+  }
+  let relay = params.get("r") || location.origin;
+  if (!/^https?:\/\//.test(relay)) relay = "https://" + relay;
+  relay = relay.replace(/\/+$/, "");
+  let K;
+  try { K = b64d(kParam); if (K.length !== 32) throw 0; } catch { return status("This link is damaged — check it was copied completely.", true); }
+  const id = b64e(await hkdf(K, SALT, "id", 16));
+  const ck = await hkdf(K, SALT, "config", 32);
+  const fp = await fingerprint(K);
+
+  let resp;
+  try { resp = await fetch(`${relay}/v1/r/${id}/config`, { cache: "no-store", referrerPolicy: "no-referrer" }); }
+  catch { return status(`Couldn't reach the relay at ${relay}. If it's on your local network, your browser may be blocking it; try the link on the same network or ask the agent for another relay.`, true); }
+  if (resp.status === 410) { forgetLink(); return status("This request has already been answered. Each link works once.", true); }
+  if (resp.status === 404) return status("This request has expired, was cancelled, or was already answered. Ask the agent for a new link if you still need to send something.", true);
+  if (!resp.ok) return status(`The relay answered ${resp.status}. Try again, or ask the agent for a new link.`, true);
+  let wire;
+  try {
+    const blob = new Uint8Array(await resp.arrayBuffer());
+    wire = JSON.parse(td.decode(await aesOpen(ck, "peekless/v1/config:" + id, blob)));
+    if (wire.v !== 1) throw 0;
+  } catch { return status("This request couldn't be decrypted: the link is damaged or the data was tampered with.", true); }
+  render(wire, { relay, id, fp, pkR: b64d(wire.pubkey) });
+}
+
+function render(wire, ctx) {
+  const cfg = wire.config, c = wire.context, prefix = wire.env_prefix || "PEEKLESS_";
+  const app = document.getElementById("app");
+  const parts = [app.firstElementChild];
+
+  parts.push(h("h1", {}, cfg.title));
+  const expires = h("span", {}, relTime(c.expires_at));
+  setInterval(() => { expires.textContent = relTime(c.expires_at); }, 15000);
+  parts.push(h("div", { class: "card fp" },
+    h("span", { class: "emoji", "aria-label": "request fingerprint" }, ctx.fp),
+    h("span", { class: "meta" }, "These should match the emoji your agent showed you. If they don't, close this page.")));
+  parts.push(h("div", { class: "meta" },
+    `Requested by ${c.user}@${c.host} · expires `, expires));
+
+  if (cfg.instructions) parts.push(h("div", { class: "card" }, h("h2", {}, "Instructions"), linkify(cfg.instructions)));
+
+  // What will happen with the values.
+  const use = [h("h2", {}, "What your values will be used for")];
+  if (cfg.run && wire.exec) {
+    use.push(h("div", {}, "This command runs on ", h("b", {}, c.host), " in ", h("code", {}, cfg.run.cwd || c.cwd), ":"));
+    use.push(h("pre", {}, wire.exec.map(shq).join(" ")));
+    if (cfg.run.script) use.push(h("div", { class: "meta", style: "margin-top:8px" }, "Script:"), h("pre", {}, cfg.run.script));
+  }
+  for (const f of cfg.files || []) {
+    const how = [`mode ${f.mode || "0600"}`, `format ${f.format || "raw"}`];
+    if (f.overwrite) how.push("may replace an existing file");
+    if (f.cleanup === "after_run") how.push("deleted after the command");
+    use.push(h("div", { style: "margin-top:12px" }, "Writes ", h("code", {}, f.path), h("span", { class: "meta" }, ` (${how.join(", ")}):`)));
+    use.push(templateView(f.template));
+  }
+  use.push(h("div", { class: "meta", style: "margin-top:10px" },
+    `Each field reaches the command as the environment variable ${prefix}<NAME>. The agent sees only the command's output, with secret values scrubbed.`));
+  parts.push(h("div", { class: "card" }, use));
+
+  if (wire.warnings?.length) {
+    parts.push(h("div", { class: "card warn" }, h("h2", {}, "Check before sending"),
+      h("ul", {}, wire.warnings.map(w => h("li", {}, w)))));
+  }
+
+  // Fields.
+  const states = [];
+  const fieldsCard = h("div", { class: "card" }, h("h2", {}, "Values"));
+  const send = h("button", { class: "primary", disabled: true }, "Encrypt & send");
+  for (const f of cfg.fields) {
+    const st = { f, secret: f.secret !== false, share: !!f.share_metadata, skip: false, re: f.pattern ? compile(f.pattern) : null };
+    states.push(st);
+    const inputId = "f_" + f.name;
+    const input = f.multiline
+      ? h("textarea", { id: inputId, spellcheck: "false", autocomplete: "off", autocapitalize: "off" })
+      : h("input", { id: inputId, type: "password", spellcheck: "false", autocomplete: "off", autocapitalize: "off" });
+    st.input = input;
+    let shown = false;
+    const showBtn = h("button", { type: "button", onclick: () => { shown = !shown; applyMask(); } }, "Show");
+    const applyMask = () => {
+      const masked = st.secret && !shown;
+      if (f.multiline) input.classList.toggle("masked", masked); else input.type = masked ? "password" : "text";
+      showBtn.textContent = masked ? "Show" : "Hide";
+      showBtn.classList.toggle("hidden", !st.secret);
+      shareBox.disabled = !st.secret;
+    };
+    const secretBox = h("input", { type: "checkbox", checked: st.secret, onchange: e => { st.secret = e.target.checked; applyMask(); } });
+    const shareBox = h("input", { type: "checkbox", checked: st.share, onchange: e => { st.share = e.target.checked; } });
+    const msg = h("div", {});
+    const skipBox = h("input", { type: "checkbox", onchange: e => { st.skip = e.target.checked; validate(); } });
+    const skipRow = h("label", { class: "hidden" }, skipBox, "The format check is wrong — send anyway");
+    st.validate = () => {
+      const v = input.value;
+      msg.replaceChildren();
+      skipRow.classList.add("hidden");
+      if (!v) { st.ok = !!f.optional; return; }
+      if (st.re && !st.re.test(v)) {
+        msg.className = "err";
+        msg.textContent = `This doesn't look like ${f.pattern_hint || "the expected format"}.`;
+        skipRow.classList.remove("hidden");
+        st.ok = st.skip;
+        st.skipped = st.skip;
+        return;
+      }
+      st.skipped = false;
+      if (v !== v.trim()) { msg.className = "meta"; msg.textContent = "Note: starts or ends with whitespace."; }
+      st.ok = true;
+    };
+    input.addEventListener("input", () => validate());
+    fieldsCard.append(h("div", { class: "field" },
+      h("label", { class: "main", for: inputId }, f.label || f.name,
+        h("span", { class: "tag mono" }, prefix + f.name), f.optional ? h("span", { class: "tag" }, "optional") : null),
+      f.description ? linkify(f.description) : null,
+      f.steps ? h("details", { open: true }, h("summary", { class: "meta" }, "How to get it"), linkify(f.steps)) : null,
+      h("div", { class: "row" }, input, showBtn),
+      msg,
+      h("div", { class: "toggles" },
+        h("label", { title: "Secret values are hidden from the agent and scrubbed from the command's output." }, secretBox, "Secret"),
+        h("label", { title: "Let the agent see the length, character types and a short hash, to sanity-check the value." }, shareBox, "Share length & character types"),
+        skipRow)));
+    applyMask();
+  }
+  function validate() {
+    states.forEach(s => s.validate());
+    send.disabled = !states.every(s => s.ok);
+  }
+  parts.push(fieldsCard);
+
+  const reason = h("textarea", { placeholder: "Optional: tell the agent why", style: "min-height:60px" });
+  const declineBox = h("div", { class: "card hidden" }, h("h2", {}, "Decline this request"), reason,
+    h("div", { class: "actions" }, h("span"), h("button", { onclick: () => submit(true) }, "Decline")));
+  const err = h("div", { class: "err" });
+  parts.push(h("div", { class: "actions" },
+    h("button", { onclick: () => declineBox.classList.toggle("hidden") }, "Decline…"), send));
+  parts.push(err, declineBox);
+  parts.push(h("footer", {},
+    `Values are encrypted in this browser before they leave it; the relay (${new URL(ctx.relay).host}) only relays ciphertext. `,
+    `peekless page v${VERSION} — `,
+    h("a", { href: `https://github.com/BohdanTkachenko/peekless/tree/v${VERSION}`, target: "_blank", rel: "noopener noreferrer" }, "source"),
+    ` · verify: save this page, then `, h("code", {}, "gh attestation verify <file> --repo BohdanTkachenko/peekless")));
+  app.replaceChildren(...parts);
+  validate();
+
+  send.addEventListener("click", () => submit(false));
+  async function submit(declined) {
+    send.disabled = true;
+    err.textContent = "";
+    try {
+      const answer = declined
+        ? { v: 1, declined: true, reason: reason.value, fields: {} }
+        : { v: 1, declined: false, fields: Object.fromEntries(states.map(s => [s.f.name, {
+            value: s.input.value, secret: s.secret, share_metadata: s.secret && s.share, skip_validation: !!s.skipped }])) };
+      const blob = await sealAnswer(ctx.pkR, ctx.id, te.encode(JSON.stringify(answer)));
+      const r = await fetch(`${ctx.relay}/v1/r/${ctx.id}/answer`, {
+        method: "PUT", body: blob, headers: { "content-type": "application/octet-stream" }, referrerPolicy: "no-referrer" });
+      if (r.status === 409) throw new Error("This request was already answered.");
+      if (r.status === 404) throw new Error("This request expired or was cancelled.");
+      if (!r.ok) throw new Error(`The relay answered ${r.status}.`);
+      for (const s of states) s.input.value = "";
+      forgetLink();
+      app.replaceChildren(app.firstElementChild, h("div", { class: "card done" },
+        h("div", { class: "big" }, declined ? "✋" : "✅"),
+        h("h1", {}, declined ? "Declined" : "Sent"),
+        h("div", { class: "meta" }, declined
+          ? "The agent has been told. You can close this tab."
+          : "The agent's command runs now. You can close this tab.")));
+    } catch (e) {
+      err.textContent = e.message || String(e);
+      validate();
+    }
+  }
+}
+
+main().catch(e => status("Something went wrong: " + (e.message || e), true));
+</script>
+</body>
+</html>

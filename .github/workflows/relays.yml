@@ -1,0 +1,26 @@
+# Health-checks relays.json weekly and opens a PR removing relays that fail
+# every probe. A human merges it.
+name: relays
+on:
+  schedule: [{ cron: "17 6 * * 1" }]
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/check_relays.py
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git diff --quiet relays.json && exit 0
+          branch=relays/prune-$(date +%Y%m%d)
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git checkout -b "$branch"
+          git commit -am "chore(relays): remove unreachable relays"
+          git push -u origin "$branch"
+          gh pr create --fill --body "$(cat relay-report.txt)"

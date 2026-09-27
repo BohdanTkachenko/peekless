@@ -1,0 +1,42 @@
+# Publishes the page to GitHub Pages from release tags only. Every release
+# keeps its own path (/v<version>/), rebuilt from that tag's commit, so a CLI
+# always links the exact page it embeds and older CLIs keep working.
+# Each file gets a Sigstore build-provenance attestation:
+#   gh attestation verify index.html --repo BohdanTkachenko/peekless
+name: pages
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  attestations: write
+concurrency: pages
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Assemble every released page
+        run: |
+          mkdir site
+          for tag in $(git tag -l 'v*' --sort=version:refname); do
+            mkdir -p "site/$tag"
+            git show "$tag:page/index.html" > "site/$tag/index.html"
+            latest=$tag
+          done
+          cp "site/$latest/index.html" site/index.html
+          (cd site && find . -name index.html | sort | xargs sha256sum | tee SHA256SUMS)
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-checksums: site/SHA256SUMS
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+      - id: deploy
+        uses: actions/deploy-pages@v4
