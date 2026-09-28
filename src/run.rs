@@ -164,9 +164,32 @@ async fn host_is_private(url: &str) -> Result<bool> {
     Ok(!addrs.is_empty() && addrs.iter().all(|a| is_private(a.ip())))
 }
 
+/// Optional per-user defaults in `$XDG_CONFIG_HOME/peekless/config.yaml`:
+///     relay: https://relay.example
+#[derive(serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+struct UserConfig {
+    relay: Option<String>,
+}
+
+fn user_config() -> Result<UserConfig> {
+    let dir = std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")));
+    let Some(path) = dir.map(|d| d.join("peekless/config.yaml")) else { return Ok(UserConfig::default()) };
+    match std::fs::read_to_string(&path) {
+        Ok(text) => serde_norway::from_str(&text).with_context(|| format!("parsing {}", path.display())),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(UserConfig::default()),
+        Err(e) => Err(e).with_context(|| format!("reading {}", path.display())),
+    }
+}
+
 async fn pick_relay(opts: &RunOpts) -> Result<String> {
     if let Some(r) = &opts.relay {
         return Ok(r.clone());
+    }
+    if let Some(r) = user_config()?.relay {
+        return Ok(r);
     }
     #[derive(serde::Deserialize)]
     struct List {

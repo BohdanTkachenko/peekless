@@ -77,7 +77,8 @@ Run `peekless run <config>` **in the background**. It prints a link and a
 four-emoji fingerprint, then waits. Send the user both, and tell them the
 fingerprint must match. Relays:
 
-- default: the bundled public relays; `--relay <url>` for a specific one.
+- default: `relay:` from `~/.config/peekless/config.yaml` if set, else the
+  bundled public relays; `--relay <url>` for a specific one.
 - `--serve 0.0.0.0:<port>`: built-in relay when the user is on the same LAN or
   tailnet (plain HTTP is only allowed on private addresses).
 

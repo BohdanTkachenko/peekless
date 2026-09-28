@@ -36,7 +36,8 @@ enum Cmd {
     Run {
         /// Request config (YAML or JSON).
         config: PathBuf,
-        /// Relay base URL. Default: the first healthy relay in the bundled list.
+        /// Relay base URL. Default: `relay` in ~/.config/peekless/config.yaml, else
+        /// the first healthy relay in the bundled list.
         #[arg(long, conflicts_with = "serve")]
         relay: Option<String>,
         /// Run a relay in-process on this address and serve the page from it
